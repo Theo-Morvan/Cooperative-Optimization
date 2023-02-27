@@ -17,6 +17,12 @@ class instance:
         number_of_agents,data_per_agent = np.shape(agents) 
         self.number_of_agents = number_of_agents
         self.data_per_agent = data_per_agent
+        matrixA = np.identity(number_of_agents*data_size)
+        for index in range(data_size):
+                matrixA[(number_of_agents-1)*data_size+index,(number_of_agents-1)*data_size+index]=0
+        for index in range((number_of_agents-1)*data_size):
+                matrixA[index,index+data_size]=-1
+        self.matrixA = matrixA
 
     def objective(self,curent_solution):
         objecti = np.dot(curent_solution,np.dot(self.Knn_matrix,curent_solution))
@@ -42,10 +48,6 @@ class solver :
         self.number_iteration = number_iteration
         self.initialisation = initialisation
         self.variable_zize = np.shape(initialisation)[0]
-    
-    def display_objective(self):
-        for agent_index in range(self.instance.number_of_agents):
-            print("Agent "+str(agent_index)+" objective : "+str(self.instance.objective(self.curent_solution[agent_index])))
         
 
 class DGD(solver):
@@ -75,7 +77,8 @@ class DGD(solver):
         self.new_solution[agent_index]-=self.step_size*gradient
 
     def display_objective(self):
-        return super().display_objective()
+        for agent_index in range(self.instance.number_of_agents):
+            print("Agent "+str(agent_index)+" objective : "+str(self.instance.objective(self.curent_solution[agent_index])))
 
 
 class gradient_tracking(DGD):
@@ -127,18 +130,51 @@ class gradient_tracking(DGD):
         return super().display_objective()
 
 
-    
-
-
-
 
 class dual_decomposition(solver):
 
-    def __init__(self,instance1,step_size,number_iteration,initialisation) -> None:
-        super().__init__(instance1,step_size,number_iteration,initialisation)
+    def __init__(self,instance1,step_size_primal,step_size_dual,number_iteration_primal,number_iteration_dual,initialisation, initialisation_dual) -> None:
+        super().__init__(instance1,step_size_primal,number_iteration_primal,initialisation)
+        self.curent_primal_solution = np.array([initialisation for i in range(instance1.number_of_agents)])
+        self.new_primal_solution = np.array([initialisation for i in range(instance1.number_of_agents)])
+        self.step_size_dual = step_size_dual
+        self.number_iteration_dual = number_iteration_dual
+        self.curent_dual_variable = initialisation_dual
+        self.new_dual_variable = initialisation_dual
+
 
     def solve(self):
+        for iteration in range(self.number_iteration_dual):
+            print("Iteration : "+str(iteration))
+            self.compute_primal_variableS()
+            self.do_dual_ascent_step()
+            self.curent_dual_variable = self.new_dual_variable
+            # print(self.curent_dual_variable)
         return
+    
+    def compute_primal_variableS(self):
+        for agent_index in range(self.instance.number_of_agents):
+              self.compute_primal_variable(agent_index)
+        self.curent_primal_solution = self.new_primal_solution
+
+    def compute_primal_variable(self,agent_index):
+         for primal_iteration in range(self.number_iteration):
+              self.do_primal_iteration_step(agent_index)
+
+    def do_primal_iteration_step(self,agent_index):
+         gradient = self.instance.gradient(agent_index,self.curent_primal_solution[agent_index]) 
+         agent_index_th_column_of_A = self.instance.matrixA[:,agent_index*self.instance.data_size:(agent_index+1)*self.instance.data_size].T
+         gradient += np.dot(agent_index_th_column_of_A,self.curent_dual_variable)
+         self.new_primal_solution[agent_index]=self.curent_primal_solution[agent_index]
+         self.new_primal_solution[agent_index]-=self.step_size*gradient
+         
+
+    def do_dual_ascent_step(self):
+        self.new_dual_variable = self.curent_dual_variable
+        gradient = np.dot(self.instance.matrixA,self.curent_primal_solution.flatten())
+        print("Norme du gradient : "+str(np.linalg.norm(gradient)))
+        self.new_dual_variable += self.step_size_dual*gradient
+
 
 class ADMM(solver):
 
