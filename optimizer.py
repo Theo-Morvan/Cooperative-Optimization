@@ -24,6 +24,15 @@ class instance:
             matrix_Kim = np.array([kernel(self.X[agent_index],self.X[agent_index_2]) for agent_index_2 in range(self.data_size)])
             objecti+=(1/(2*(self.sigma**2)))*(self.Y[agent_index]-np.dot(matrix_Kim,curent_solution))**2
         return(objecti)
+    
+    def gradient(self,agent_index,point):
+        first_term = np.dot(self.Knn_matrix,point)/5
+        matrix_K0m =np.array([kernel(self.X[self.agents[agent_index,0]],self.X[j]) for j in range(self.data_size)])
+        matrix_K1m = np.array([kernel(self.X[self.agents[agent_index,1]],self.X[j]) for j in range(self.data_size)])
+        second_term = (matrix_K0m*(self.Y[self.agents[agent_index,0]]-np.dot(matrix_K0m,point)) + 
+                        matrix_K1m*(self.Y[self.agents[agent_index,1]]-np.dot(matrix_K1m,point)))/(self.sigma**2)
+        return first_term - second_term
+
 
 class solver : 
 
@@ -33,6 +42,10 @@ class solver :
         self.number_iteration = number_iteration
         self.initialisation = initialisation
         self.variable_zize = np.shape(initialisation)[0]
+    
+    def display_objective(self):
+        for agent_index in range(self.instance.number_of_agents):
+            print("Agent "+str(agent_index)+" objective : "+str(self.instance.objective(self.curent_solution[agent_index])))
         
 
 class DGD(solver):
@@ -40,10 +53,6 @@ class DGD(solver):
         super().__init__(instance1,step_size,number_iteration,initialisation)
         self.curent_solution = np.array([initialisation for i in range(instance1.number_of_agents)])
         self.new_solution = np.array([initialisation for i in range(instance1.number_of_agents)])
-    
-    def display_objective(self):
-        for agent_index in range(self.instance.number_of_agents):
-            print("Agent "+str(agent_index)+" objective : "+str(self.instance.objective(self.curent_solution[agent_index])))
 
     def solve(self):
         for iteration in range(self.number_iteration):
@@ -54,33 +63,73 @@ class DGD(solver):
     def do_optimisation_step_DGD(self):
         self.new_solution = np.zeros([self.instance.number_of_agents,self.variable_zize])
         for agent_index in range(self.instance.number_of_agents):
-            self.do_local_optimisation_step_DGD(agent_index)
+            self.do_local_gradient_descent(agent_index)
         self.display_objective()
         self.curent_solution = self.new_solution
 
-    def do_local_optimisation_step_DGD(self,agent_index):
-        gradient = self.gradientDGD(agent_index)
+    def do_local_gradient_descent(self,agent_index):
+        gradient = self.instance.gradient(agent_index,self.curent_solution[agent_index])
         print("Agent " + str(agent_index)+" norme du gradient : "+str(np.linalg.norm(gradient)))
         for agent_index_2 in range(self.instance.number_of_agents):
-            self.new_solution[agent_index]=self.instance.adjacence_matrix[agent_index,agent_index_2]*self.curent_solution[agent_index_2]-self.step_size*gradient
+            self.new_solution[agent_index]+=self.instance.adjacence_matrix[agent_index,agent_index_2]*self.curent_solution[agent_index_2]
+        self.new_solution[agent_index]-=self.step_size*gradient
 
-    def gradientDGD(self,agent_index):
-        first_term = np.dot(self.instance.Knn_matrix,self.curent_solution[agent_index])/5
-        matrix_K0m =np.array([kernel(self.instance.X[self.instance.agents[agent_index,0]],self.instance.X[j]) for j in range(self.instance.data_size)])
-        matrix_K1m = np.array([kernel(self.instance.X[self.instance.agents[agent_index,1]],self.instance.X[j]) for j in range(self.instance.data_size)])
-        second_term = (matrix_K0m*(self.instance.Y[self.instance.agents[agent_index,0]]-np.dot(matrix_K0m,self.curent_solution[agent_index])) + 
-                        matrix_K1m*(self.instance.Y[self.instance.agents[agent_index,1]]-np.dot(matrix_K1m,self.curent_solution[agent_index])))/(self.instance.sigma**2)
-        return first_term - second_term
+    def display_objective(self):
+        return super().display_objective()
 
 
-
-class gradient_tracking(solver):
+class gradient_tracking(DGD):
 
     def __init__(self,instance1,step_size,number_iteration,initialisation) -> None:
         super().__init__(instance1,step_size,number_iteration,initialisation)
+        self.curent_gradient_like = np.array([self.instance.gradient(agent_index,initialisation) for agent_index in range(instance1.number_of_agents)])
+        self.new_gradient_like = np.array([self.instance.gradient(agent_index,initialisation) for agent_index in range(instance1.number_of_agents)])
 
-    def gradient_tracking(self):
-        return
+    def solve(self):
+        for iteration in range(self.number_iteration):
+            print("Iterration : "+str(iteration))
+            self.do_optimisation_step_gradient_tracking()
+        # print(self.curent_solution)
+        return(self.curent_solution)
+
+    def do_optimisation_step_gradient_tracking(self):
+        self.new_solution = np.zeros([self.instance.number_of_agents,self.variable_zize])
+        self.new_gradient_like = np.zeros([self.instance.number_of_agents,self.variable_zize])
+
+        for agent_index in range(self.instance.number_of_agents):
+            self.do_local_gradient_descent(agent_index)
+
+        for agent_index in range(self.instance.number_of_agents):
+            self.do_local_gradient_like_update(agent_index)
+
+        # print(self.new_solution)
+
+        self.curent_solution = self.new_solution
+        self.curent_gradient_like = self.new_gradient_like
+        self.display_objective()
+
+    def do_local_gradient_descent(self,agent_index):
+        gradient = self.curent_gradient_like[agent_index]
+        print("Agent " + str(agent_index)+" norme du gradient (gradient like) : "+str(np.linalg.norm(gradient)))
+        for agent_index_2 in range(self.instance.number_of_agents):
+            self.new_solution[agent_index]+=self.instance.adjacence_matrix[agent_index,agent_index_2]*self.curent_solution[agent_index_2]
+        self.new_solution[agent_index]-=self.step_size*gradient
+
+    def do_local_gradient_like_update(self,agent_index):
+        for agent_index_2 in range(self.instance.number_of_agents):
+            self.new_gradient_like[agent_index]+= self.instance.adjacence_matrix[agent_index,agent_index_2]*self.curent_gradient_like[agent_index_2]
+        gradient_iteration_k = self.instance.gradient(agent_index,self.curent_solution[agent_index])
+        gradient_iteration_k_plus_1 = self.instance.gradient(agent_index,self.new_solution[agent_index])
+        self.new_gradient_like[agent_index]-= gradient_iteration_k
+        self.new_gradient_like[agent_index]+= gradient_iteration_k_plus_1
+        
+    def display_objective(self):
+        return super().display_objective()
+
+
+    
+
+
 
 
 class dual_decomposition(solver):
@@ -88,7 +137,7 @@ class dual_decomposition(solver):
     def __init__(self,instance1,step_size,number_iteration,initialisation) -> None:
         super().__init__(instance1,step_size,number_iteration,initialisation)
 
-    def dual_decomposition(self):
+    def solve(self):
         return
 
 class ADMM(solver):
@@ -96,5 +145,5 @@ class ADMM(solver):
     def __init__(self,instance1,step_size,number_iteration,initialisation) -> None:
         super().__init__(instance1,step_size,number_iteration,initialisation)
 
-    def ADMM(self):
+    def solve(self):
         return
