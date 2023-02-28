@@ -149,7 +149,7 @@ class dual_decomposition(solver):
             self.compute_primal_variableS()
             self.do_dual_ascent_step()
             self.curent_dual_variable = self.new_dual_variable
-            # print(self.curent_dual_variable)
+            self.display_objective()
         return
     
     def compute_primal_variableS(self):
@@ -164,7 +164,9 @@ class dual_decomposition(solver):
     def do_primal_iteration_step(self,agent_index):
          gradient = self.instance.gradient(agent_index,self.curent_primal_solution[agent_index]) 
          agent_index_th_column_of_A = self.instance.matrixA[:,agent_index*self.instance.data_size:(agent_index+1)*self.instance.data_size].T
-         gradient += np.dot(agent_index_th_column_of_A,self.curent_dual_variable)
+         communication_vector = np.array([self.instance.adjacence_matrix[agent_index] for index in range(self.instance.data_size)]).T.flatten()
+         components_of_dual_variable_communicated = self.curent_dual_variable*communication_vector
+         gradient += np.dot(agent_index_th_column_of_A,components_of_dual_variable_communicated)
          self.new_primal_solution[agent_index]=self.curent_primal_solution[agent_index]
          self.new_primal_solution[agent_index]-=self.step_size*gradient
          
@@ -174,6 +176,11 @@ class dual_decomposition(solver):
         gradient = np.dot(self.instance.matrixA,self.curent_primal_solution.flatten())
         print("Norme du gradient : "+str(np.linalg.norm(gradient)))
         self.new_dual_variable += self.step_size_dual*gradient
+
+    def display_objective(self):
+        for agent_index in range(self.instance.number_of_agents):
+            print("Agent "+str(agent_index)+" objective : "+str(self.instance.objective(self.curent_primal_solution[agent_index])))
+
 
 
 class ADMM(solver):
