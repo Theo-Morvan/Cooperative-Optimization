@@ -78,7 +78,7 @@ class DGD(solver):
 
     def display_objective(self):
         for agent_index in range(self.instance.number_of_agents):
-            print("Agent "+str(agent_index)+" objective : "+str(self.instance.objective(self.curent_solution[agent_index])))
+            print("Agent "+str(agent_index+1)+" objective : "+str(self.instance.objective(self.curent_solution[agent_index])))
 
 
 class gradient_tracking(DGD):
@@ -92,7 +92,6 @@ class gradient_tracking(DGD):
         for iteration in range(self.number_iteration):
             print("Iterration : "+str(iteration))
             self.do_optimisation_step_gradient_tracking()
-        # print(self.curent_solution)
         return(self.curent_solution)
 
     def do_optimisation_step_gradient_tracking(self):
@@ -104,8 +103,6 @@ class gradient_tracking(DGD):
 
         for agent_index in range(self.instance.number_of_agents):
             self.do_local_gradient_like_update(agent_index)
-
-        # print(self.new_solution)
 
         self.curent_solution = self.new_solution
         self.curent_gradient_like = self.new_gradient_like
@@ -178,7 +175,7 @@ class dual_decomposition(solver):
 
     def display_objective(self):
         for agent_index in range(self.instance.number_of_agents):
-            print("Agent "+str(agent_index)+" objective : "+str(self.instance.objective(self.curent_primal_solution[agent_index])))
+            print("Agent "+str(agent_index+1)+" objective : "+str(self.instance.objective(self.curent_primal_solution[agent_index])))
 
 
 class dual_decomposition_edge(solver):
@@ -231,14 +228,48 @@ class dual_decomposition_edge(solver):
 
     def display_objective(self):
         for agent_index in range(self.instance.number_of_agents):
-            print("Agent "+str(agent_index)+" objective : "+str(self.instance.objective(self.curent_primal_solution[agent_index])))
+            print("Agent "+str(agent_index+1)+" objective : "+str(self.instance.objective(self.curent_primal_solution[agent_index])))
 
 
 
 class ADMM(solver):
 
-    def __init__(self,instance1,step_size,number_iteration,initialisation) -> None:
+    def __init__(self,instance1,step_size,number_iteration,initialisation,initialisation_y,beta) -> None:
         super().__init__(instance1,step_size,number_iteration,initialisation)
+        self.curent_solution = np.array([initialisation for index in range(self.instance.number_of_agents)])
+        self.new_solution = np.array([initialisation for index in range(self.instance.number_of_agents)])
+        self.curent_y = np.array([[initialisation_y for index in range(self.instance.number_of_agents)]for index_2 in range(self.instance.number_of_agents)])
+        self.new_y = np.array([[initialisation_y for index in range(self.instance.number_of_agents)]for index_2 in range(self.instance.number_of_agents)])
+        self.beta = beta
 
     def solve(self):
-        return
+        for iteration in range(self.number_iteration):
+            print("Iteration : "+str(iteration))
+            self.compute_primal_variableS()
+            self.curent_solution = self.new_solution
+            self.update_y()
+            self.curent_y = self.new_y
+            self.display_objective()
+
+    def compute_primal_variableS(self):
+        for agent_index in range(self.instance.number_of_agents):
+            self.compute_primal_variable(agent_index)
+    
+    def compute_primal_variable(self,agent_index):
+        gradient = self.instance.gradient(agent_index,self.curent_solution[agent_index])
+        for agent_index_2 in range(self.instance.number_of_agents):
+            gradient += self.beta*self.instance.adjacence_matrix[agent_index,agent_index_2]*(self.curent_solution[agent_index]-self.curent_y[agent_index,agent_index_2])
+        self.new_solution[agent_index]=self.curent_solution[agent_index]-self.step_size*gradient
+
+
+    def update_y(self):
+        for agent_index in range(self.instance.number_of_agents):
+            for agent_index_2 in range(self.instance.number_of_agents):
+                self.do_local_update_y(agent_index,agent_index_2)
+    
+    def do_local_update_y(self,agent_index,agent_index_2):
+        self.new_y[agent_index,agent_index_2]=(self.curent_solution[agent_index]+self.curent_solution[agent_index_2])/2
+
+    def display_objective(self):
+        for agent_index in range(self.instance.number_of_agents):
+            print("Agent "+str(agent_index+1)+" objective : "+str(self.instance.objective(self.curent_solution[agent_index])))

@@ -37,8 +37,12 @@ instance_pb = optimizer.instance(x_selected,y_selected,agents,W2,0.5)
 # solver_dual_decomposition.solve()
 # print(solver_dual_decomposition.curent_primal_solution)
 
-solver_dual_decomposition = optimizer.dual_decomposition_edge(instance_pb,0.01,0.01,100,1000,np.ones(10),np.ones(10))
-solver_dual_decomposition.solve()
-print(solver_dual_decomposition.curent_primal_solution)
+# solver_dual_decomposition_edge = optimizer.dual_decomposition_edge(instance_pb,0.01,0.01,100,1000,np.ones(10),np.ones(10))
+# solver_dual_decomposition_edge.solve()
+# print(solver_dual_decomposition_edge.curent_primal_solution)
+
+solver_ADMM = optimizer.ADMM(instance_pb,0.01,100,np.ones(10),np.ones(10),10)
+solver_ADMM.solve()
+print(solver_ADMM.curent_solution)
 
 
