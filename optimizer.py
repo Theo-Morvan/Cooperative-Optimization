@@ -129,6 +129,55 @@ class gradient_tracking(DGD):
     def display_objective(self):
         return super().display_objective()
 
+class dual_decomposition(solver):
+
+    def __init__(self,instance1,step_size_primal,step_size_dual,number_iteration_primal,number_iteration_dual,initialisation, initialisation_dual) -> None:
+        super().__init__(instance1,step_size_primal,number_iteration_primal,initialisation)
+        self.curent_primal_solution = np.array([initialisation for i in range(instance1.number_of_agents)])
+        self.new_primal_solution = np.array([initialisation for i in range(instance1.number_of_agents)])
+        self.step_size_dual = step_size_dual
+        self.number_iteration_dual = number_iteration_dual
+        self.curent_dual_variable = initialisation_dual
+        self.new_dual_variable = initialisation_dual
+
+
+    def solve(self):
+        for iteration in range(self.number_iteration_dual):
+            print("Iteration : "+str(iteration))
+            self.compute_primal_variableS()
+            self.do_dual_ascent_step()
+            self.curent_dual_variable = self.new_dual_variable
+            self.display_objective()
+        return
+    
+    def compute_primal_variableS(self):
+        for agent_index in range(self.instance.number_of_agents):
+              self.compute_primal_variable(agent_index)
+        self.curent_primal_solution = self.new_primal_solution
+
+    def compute_primal_variable(self,agent_index):
+         for primal_iteration in range(self.number_iteration):
+              self.do_primal_iteration_step(agent_index)
+
+    def do_primal_iteration_step(self,agent_index):
+         gradient = self.instance.gradient(agent_index,self.curent_primal_solution[agent_index]) 
+         agent_index_th_column_of_A = self.instance.matrixA[:,agent_index*self.instance.data_size:(agent_index+1)*self.instance.data_size].T
+         communication_vector = np.array([self.instance.adjacence_matrix[agent_index] for index in range(self.instance.data_size)]).T.flatten()
+         components_of_dual_variable_communicated = self.curent_dual_variable*communication_vector
+         gradient += np.dot(agent_index_th_column_of_A,components_of_dual_variable_communicated)
+         self.new_primal_solution[agent_index]=self.curent_primal_solution[agent_index]
+         self.new_primal_solution[agent_index]-=self.step_size*gradient
+         
+
+    def do_dual_ascent_step(self):
+        self.new_dual_variable = self.curent_dual_variable
+        gradient = np.dot(self.instance.matrixA,self.curent_primal_solution.flatten())
+        print("Norme du gradient : "+str(np.linalg.norm(gradient)))
+        self.new_dual_variable += self.step_size_dual*gradient
+
+    def display_objective(self):
+        for agent_index in range(self.instance.number_of_agents):
+            print("Agent "+str(agent_index)+" objective : "+str(self.instance.objective(self.curent_primal_solution[agent_index])))
 
 
 class dual_decomposition(solver):
@@ -176,6 +225,59 @@ class dual_decomposition(solver):
         gradient = np.dot(self.instance.matrixA,self.curent_primal_solution.flatten())
         print("Norme du gradient : "+str(np.linalg.norm(gradient)))
         self.new_dual_variable += self.step_size_dual*gradient
+
+    def display_objective(self):
+        for agent_index in range(self.instance.number_of_agents):
+            print("Agent "+str(agent_index)+" objective : "+str(self.instance.objective(self.curent_primal_solution[agent_index])))
+
+
+class dual_decomposition_edge(solver):
+
+    def __init__(self,instance1,step_size_primal,step_size_dual,number_iteration_primal,number_iteration_dual,initialisation, initialisation_dual) -> None:
+        super().__init__(instance1,step_size_primal,number_iteration_primal,initialisation)
+        self.curent_primal_solution = np.array([initialisation for i in range(instance1.number_of_agents)])
+        self.new_primal_solution = np.array([initialisation for i in range(instance1.number_of_agents)])
+        self.step_size_dual = step_size_dual
+        self.number_iteration_dual = number_iteration_dual
+        #one dual variable per edge of the graph
+        self.curent_dual_variable = np.array([[initialisation_dual for index in range(self.instance.number_of_agents)]for index2 in range(self.instance.number_of_agents)])
+        self.new_dual_variable = np.array([[initialisation_dual for index in range(self.instance.number_of_agents)]for index2 in range(self.instance.number_of_agents)])
+
+
+    def solve(self):
+        for iteration in range(self.number_iteration_dual):
+            print("Iteration : "+str(iteration))
+            self.compute_primal_variableS()
+            self.do_dual_ascent_step()
+            self.curent_dual_variable = self.new_dual_variable
+            self.display_objective()
+        return
+    
+    def compute_primal_variableS(self):
+        for agent_index in range(self.instance.number_of_agents):
+              self.compute_primal_variable(agent_index)
+        self.curent_primal_solution = self.new_primal_solution
+
+    def compute_primal_variable(self,agent_index):
+         for primal_iteration in range(self.number_iteration):
+              self.do_primal_iteration_step(agent_index)
+
+    def do_primal_iteration_step(self,agent_index):
+        gradient = self.instance.gradient(agent_index,self.curent_primal_solution[agent_index]) 
+        for agent_index_2 in range(self.instance.number_of_agents):
+            gradient += self.instance.adjacence_matrix[agent_index,agent_index_2]*(self.curent_dual_variable[agent_index,agent_index_2]-self.curent_dual_variable[agent_index_2,agent_index])
+        self.new_primal_solution[agent_index]=self.curent_primal_solution[agent_index]
+        self.new_primal_solution[agent_index]-=self.step_size*gradient
+    
+    def do_dual_ascent_step(self):
+        self.new_dual_variable = self.curent_dual_variable
+        for agent_index_1 in range(self.instance.number_of_agents):
+            for agent_index_2 in range(self.instance.number_of_agents):
+                self.do_dual_ascent_step_on_edge(agent_index_1,agent_index_2)
+    
+    def do_dual_ascent_step_on_edge(self,agent_index_1,agent_index_2):
+        self.new_dual_variable[agent_index_1,agent_index_2]+=self.step_size_dual*(self.curent_primal_solution[agent_index_1]-self.curent_primal_solution[agent_index_2])
+
 
     def display_objective(self):
         for agent_index in range(self.instance.number_of_agents):
