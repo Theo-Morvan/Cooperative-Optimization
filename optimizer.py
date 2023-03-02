@@ -5,18 +5,22 @@ def kernel(x,y):
 
 
 class instance:
-    def __init__(self,x,y,agents,adjacence_matrix,sigma) -> None:
+    def __init__(self,all_x,x,y,agents_x,agents_y,adjacence_matrix,sigma) -> None:
         self.X=x
+        self.all_X = all_x
         self.Y=y
-        self.agents = agents
+        self.agents = agents_x
+        self.agents_y = agents_y
         self.adjacence_matrix = adjacence_matrix
         self.sigma = sigma
         data_size = np.shape(x)[0]
         self.data_size = data_size
         self.Knn_matrix = np.array([[kernel(x[k],x[l]) for k in range(data_size)]for l in range(data_size)])
-        number_of_agents,data_per_agent = np.shape(agents) 
+        number_of_agents,data_per_agent = np.shape(agents_x)
+        _,data_per_agent_y = np.shape(agents_y)
         self.number_of_agents = number_of_agents
         self.data_per_agent = data_per_agent
+        self.data_per_agent_y = data_per_agent_y
         matrixA = np.identity(number_of_agents*data_size)
         for index in range(data_size):
                 matrixA[(number_of_agents-1)*data_size+index,(number_of_agents-1)*data_size+index]=0
@@ -25,20 +29,19 @@ class instance:
         self.matrixA = matrixA
 
     def objective(self,curent_solution):
-        objecti = np.dot(curent_solution,np.dot(self.Knn_matrix,curent_solution))
-        for agent_index in range(self.data_size):
-            matrix_Kim = np.array([kernel(self.X[agent_index],self.X[agent_index_2]) for agent_index_2 in range(self.data_size)])
-            objecti+=(1/(2*(self.sigma**2)))*(self.Y[agent_index]-np.dot(matrix_Kim,curent_solution))**2
+        objecti = np.dot(curent_solution,np.dot(self.Knn_matrix,curent_solution))/2
+        for agent_index in range(self.number_of_agents):
+            for agent_index_2 in range(self.data_per_agent_y):
+                matrix_Kim = np.array([kernel(self.all_X[self.agents_y[agent_index,agent_index_2]],self.X[j]) for j in range(self.data_size)])
+                objecti+=(1/(2*(self.sigma**2)))*(self.Y[self.agents_y[agent_index,agent_index_2]]-np.dot(matrix_Kim,curent_solution))**2
         return(objecti)
     
     def gradient(self,agent_index,point):
-        first_term = np.dot(self.Knn_matrix,point)/5
-        matrix_K0m =np.array([kernel(self.X[self.agents[agent_index,0]],self.X[j]) for j in range(self.data_size)])
-        matrix_K1m = np.array([kernel(self.X[self.agents[agent_index,1]],self.X[j]) for j in range(self.data_size)])
-        second_term = (matrix_K0m*(self.Y[self.agents[agent_index,0]]-np.dot(matrix_K0m,point)) + 
-                        matrix_K1m*(self.Y[self.agents[agent_index,1]]-np.dot(matrix_K1m,point)))/(self.sigma**2)
-        return first_term - second_term
-
+        sum  = np.dot(self.Knn_matrix,point)/5    
+        for agent_index_2 in range(self.data_per_agent_y):
+            matrix_Kim = np.array([kernel(self.all_X[self.agents_y[agent_index,agent_index_2]],self.X[j]) for j in range(self.data_size)])
+            sum -=matrix_Kim*(self.Y[self.agents_y[agent_index,agent_index_2]]-np.dot(matrix_Kim,point))/(self.sigma**2)
+        return sum
 
 class solver : 
 
@@ -260,7 +263,6 @@ class ADMM(solver):
         for agent_index_2 in range(self.instance.number_of_agents):
             gradient += self.beta*self.instance.adjacence_matrix[agent_index,agent_index_2]*(self.curent_solution[agent_index]-self.curent_y[agent_index,agent_index_2])
         self.new_solution[agent_index]=self.curent_solution[agent_index]-self.step_size*gradient
-
 
     def update_y(self):
         for agent_index in range(self.instance.number_of_agents):
