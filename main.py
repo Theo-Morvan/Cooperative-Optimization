@@ -9,7 +9,6 @@ with open("first_database.pkl", "rb") as f:
 n= 100
 m = 10
 
-
 #mélange et séléction des données
 X = x[:n]
 Y = y[:n]
@@ -34,6 +33,12 @@ W5= np.array([[1,1,1,1,1],[1,1,1,1,1],[1,1,1,1,1],[1,1,1,1,1],[0,0,0,0,1]])
 
 #création de l'instance du problème
 instance_pb = optimizer.instance(x_shuffle,x_selected,y_shuffle,agents_x,agents_y,W2,0.5)
+
+#Solvers
+
+solver_non_cooperative = optimizer.gradient_descent(instance_pb,0.0001,20000,np.ones(10))
+solver_non_cooperative.solve()
+print(solver_non_cooperative.curent_solution)
 
 # solver_DGD = optimizer.DGD(instance_pb,0.001,200,np.ones(10))
 # solver_DGD.solve()

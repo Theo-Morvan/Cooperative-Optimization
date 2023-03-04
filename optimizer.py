@@ -14,8 +14,11 @@ class instance:
         self.adjacence_matrix = adjacence_matrix
         self.sigma = sigma
         data_size = np.shape(x)[0]
+        n = np.shape(all_x)[0]
+        self.n = n
         self.data_size = data_size
         self.Knn_matrix = np.array([[kernel(x[k],x[l]) for k in range(data_size)]for l in range(data_size)])
+        self.Knm_matrix = np.array([[kernel(x[k],all_x[l]) for k in range(data_size)]for l in range(self.n)])
         number_of_agents,data_per_agent = np.shape(agents_x)
         _,data_per_agent_y = np.shape(agents_y)
         self.number_of_agents = number_of_agents
@@ -42,6 +45,14 @@ class instance:
             matrix_Kim = np.array([kernel(self.all_X[self.agents_y[agent_index,agent_index_2]],self.X[j]) for j in range(self.data_size)])
             sum -=matrix_Kim*(self.Y[self.agents_y[agent_index,agent_index_2]]-np.dot(matrix_Kim,point))/(self.sigma**2)
         return sum
+    
+    def complete_gradient(self,point):
+        product = np.dot(self.Knm_matrix.T,self.Knm_matrix) 
+        grad = np.dot(self.Knn_matrix+(1/self.sigma**2)*product,point)
+        grad -= (1/self.sigma**2)*np.dot(self.Y.T,self.Knm_matrix)
+        return(grad)
+
+
 
 class solver : 
 
@@ -51,7 +62,26 @@ class solver :
         self.number_iteration = number_iteration
         self.initialisation = initialisation
         self.variable_zize = np.shape(initialisation)[0]
-        
+
+class gradient_descent(solver):
+    def __init__(self, instance1, step_size, number_iteration, initialisation) -> None:
+        super().__init__(instance1, step_size, number_iteration, initialisation)
+        self.curent_solution = initialisation
+        self.new_solution = initialisation
+
+    def solve(self):
+        for iteration in range(self.number_iteration):
+            self.do_gradient_descent_step()
+            self.curent_solution = self.new_solution
+            self.display_objective()
+
+    def do_gradient_descent_step(self):    
+        gradient = self.instance.complete_gradient(self.curent_solution)
+        self.new_solution = self.curent_solution - self.step_size*gradient
+    
+    def display_objective(self):
+        print("Objective : "+str(self.instance.objective(self.curent_solution)))
+
 
 class DGD(solver):
     def __init__(self,instance1,step_size,number_iteration,initialisation) -> None:
