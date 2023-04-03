@@ -64,13 +64,13 @@ class DGD_DP(solver):
         # self.new_solution[agent_index]+=x_k_i
         i= 0
         solution = 0
-        solution += x_k_i
+        solution += 0*x_k_i
         for agent_index_2 in range(self.instance.number_of_agents):
-            # x_k_j_obscured = self.obscured_solutions[agent_index_2]
+            x_k_j_obscured = self.obscured_solutions[agent_index_2]
             x_k_j = self.current_solution[agent_index_2]
             w_i_j = self.effective_communication_matrix[agent_index, agent_index_2]
             # noise_w_j = np.random.laplace(loc=0, scale=self.laplacian_scale, size=x_k_j.shape)
-            solution += gamma_value*w_i_j *(x_k_j + np.random.laplace(loc=0,scale=self.laplacian_scale, size=x_k_j.shape) - x_k_i)
+            solution += gamma_value*w_i_j *(x_k_j_obscured - 1*x_k_i)
             # weighted matrix part of update step for each agent. We need to add the laplacian noise here
         solution -= self.step_size * gradient
         self.new_solution[agent_index] = solution
@@ -112,6 +112,9 @@ class DGD_DP(solver):
         self.gamma_value = gamma_init
         self.obscured_solutions = self.send_obscured_solution(self.laplacian_scale)
         for iteration in range(self.number_iteration):
+            self.step_size = 1/(1+iteration)
+            self.gamma_value = 1/((1+iteration)**(0.9))
+            self.laplacian_scale = ((1+iteration)**(0.3))**(1/2)
             if verbose:
                 print("Iterration : " + str(iteration))
             if package_loss:
@@ -125,7 +128,7 @@ class DGD_DP(solver):
                 self.reinitialize_communication_matrix()
 
             self.update_distance_to_optimum(iteration)
-            self.gamma_value = self.decreasing_weighted_scale(iteration, self.gamma_value, decay)
+            # self.gamma_value = self.decreasing_weighted_scale(iteration, self.gamma_value, decay)
             # print(self.gamma_value)
             if np.isnan(np.min(self.current_solution)):
                 ipdb.set_trace()
