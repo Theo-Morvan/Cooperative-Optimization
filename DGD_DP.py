@@ -16,11 +16,17 @@ class DGD_DP(solver):
         self.distance_to_optimum = np.zeros(
             (self.number_iteration, instance1.number_of_agents)
         )
-        self.original_communication_matrix = compute_doubly_stochastic_matrix(
-            self.instance.communication_matrix
+        self.original_communication_matrix = (
+            compute_doubly_stochastic_matrix(
+                self.instance.communication_matrix
+            )
+            - np.eye(instance1.number_of_agents)
         )
-        self.effective_communication_matrix = compute_doubly_stochastic_matrix(
-            self.instance.communication_matrix
+        self.effective_communication_matrix = (
+            compute_doubly_stochastic_matrix(
+                self.instance.communication_matrix
+            )
+            - np.eye(instance1.number_of_agents)
         )
 
 
@@ -107,14 +113,15 @@ class DGD_DP(solver):
 
 
     
-    def solve(self, laplacian_scale:float=1.,gamma_init:float=1.,verbose=True, package_loss=False, probability_package_loss=0, decay:float=0.):
+    def solve(self, step_size:float, laplacian_scale:float=1.,gamma_init:float=1.,verbose=True, package_loss=False, probability_package_loss=0):
         self.laplacian_scale = laplacian_scale
         self.gamma_value = gamma_init
         self.obscured_solutions = self.send_obscured_solution(self.laplacian_scale)
+        self.init_step_size = step_size
         for iteration in range(self.number_iteration):
-            self.step_size = 1/(1+iteration)
+            self.step_size = self.init_step_size/(1+iteration)
             self.gamma_value = 1/((1+iteration)**(0.9))
-            self.laplacian_scale = ((1+iteration)**(0.3))**(1/2)
+            self.laplacian_scale = ((1+iteration)**(0.3))
             if verbose:
                 print("Iterration : " + str(iteration))
             if package_loss:
